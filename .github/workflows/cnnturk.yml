@@ -5,12 +5,11 @@ on:
     - cron: '30 */1 * * *'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   guncelle:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Repoya push yapabilmesi için gerekli yazma izni
     steps:
       - name: Repoyu Klonla
         uses: actions/checkout@v4
