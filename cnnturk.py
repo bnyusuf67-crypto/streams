@@ -37,6 +37,6 @@ x_forwarded_for = "0.0.0.0"
 # Get the final M3U8 link
 try:
     m3u8_link = get_m3u8_link(api_url, x_forwarded_for)
-    print(#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=7680000\nm3u8_link)
+    print(#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=7680000\n{m3u8_link})
 except KeyError as e:
     print(f"Error: {e}")
