@@ -13,17 +13,14 @@ headers = {
 }
 
 def print_clean_m3u8(m3u8_url):
-    """HTTP durum kodunu, HTML içeriğini ve m3u8 geçerliliğini kontrol eder."""
+    """Gelen adresten HTML içermeyen, temiz ve geçerli m3u8 yayınını yazdırır."""
     try:
-        res = requests.get(m3u8_url, headers=headers, verify=False, timeout=15)
+        res = requests.get(m3u8_url, headers=headers, verify=False, timeout=10)
         
-        # 1. Katman: 403, 404, 500 gibi sunucu hatalarında anında reddet
         if res.status_code != 200:
             return False
 
         text = res.text
-
-        # 2. Katman: HTML kodu içeriyorsa veya geçerli m3u8 değilse reddet
         if "<html" in text.lower() or "<body" in text.lower() or "#EXTM3U" not in text:
             return False
 
@@ -46,17 +43,17 @@ def print_clean_m3u8(m3u8_url):
         return False
 
 def fetch_from_backup():
-    """Yedek kaynağa bağlanıp HTML içermeyen temiz m3u8 yayınını getirir."""
+    """HTML koduna girmeden doğrudan yedek adresten yayını çekmeye çalışır."""
     try:
-        res = requests.get(BACKUP_URL, headers=headers, verify=False, timeout=15)
+        res = requests.get(BACKUP_URL, headers=headers, verify=False, timeout=10)
         if res.status_code == 200:
             text = res.text
 
-            # Doğrudan m3u8 içeriği döndüyse yazdır
+            # Doğrudan m3u8 döndüyse yazdır
             if "#EXTM3U" in text and "<html" not in text.lower():
                 return print_clean_m3u8(BACKUP_URL)
 
-            # HTML kodu döndüyse, içindeki gizli yayın URL'sini süzüp çağır
+            # HTML döndüyse içerikteki temiz m3u8 URL'sini süzüp çalıştır
             matches = re.findall(r'https?://[^\s"\'<>]+(?:trkvz\.php\?[^\s"\'<>]*)', text)
             for target_url in matches:
                 if target_url != BACKUP_URL:
@@ -66,37 +63,40 @@ def fetch_from_backup():
         pass
     return False
 
-# --- ANA AKIŞ ---
-success = False
+def fetch_from_main_site():
+    """Yedek başarısız olursa ana sitenin HTML ve Turkuvaz API akışını çalıştırır."""
+    try:
+        response = requests.get(TARGET_URL, headers=headers, verify=False, timeout=10)
+        if response.status_code == 200:
+            site_content = response.text
+            
+            v_match = re.search(r'data-videoid=["\']([^"\']+)["\']', site_content)
+            w_match = re.search(r'data-websiteid=["\']([^"\']+)["\']', site_content)
 
-try:
-    response = requests.get(TARGET_URL, headers=headers, verify=False, timeout=15)
-    if response.status_code == 200:
-        site_content = response.text
-        
-        v_match = re.search(r'data-videoid=["\']([^"\']+)["\']', site_content)
-        w_match = re.search(r'data-websiteid=["\']([^"\']+)["\']', site_content)
+            if v_match and w_match:
+                video_id = v_match.group(1)
+                website_id = w_match.group(1)
 
-        if v_match and w_match:
-            video_id = v_match.group(1)
-            website_id = w_match.group(1)
+                getvideo_url = f"https://videojs.tmgrup.com.tr/getvideo/{website_id}/{video_id}"
+                video_res = requests.get(getvideo_url, headers=headers, verify=False, timeout=10)
 
-            getvideo_url = f"https://videojs.tmgrup.com.tr/getvideo/{website_id}/{video_id}"
-            video_res = requests.get(getvideo_url, headers=headers, verify=False, timeout=15)
+                if video_res.status_code == 200 and video_res.json().get("success"):
+                    raw_hls_url = video_res.json()["video"]["VideoSmilUrl"]
 
-            if video_res.status_code == 200 and video_res.json().get("success"):
-                raw_hls_url = video_res.json()["video"]["VideoSmilUrl"]
+                    secure_api = "https://securevideotoken.tmgrup.com.tr/webtv/secure"
+                    token_res = requests.get(secure_api, params={"url": raw_hls_url}, headers=headers, verify=False, timeout=10)
 
-                secure_api = "https://securevideotoken.tmgrup.com.tr/webtv/secure"
-                token_res = requests.get(secure_api, params={"url": raw_hls_url}, headers=headers, verify=False, timeout=15)
+                    if token_res.status_code == 200 and token_res.json().get("Success"):
+                        secure_hls_url = token_res.json().get("Url")
+                        return print_clean_m3u8(secure_hls_url)
+    except Exception:
+        pass
+    return False
 
-                if token_res.status_code == 200 and token_res.json().get("Success"):
-                    secure_hls_url = token_res.json().get("Url")
-                    # Token URL'si 403/404 verirse print_clean_m3u8 False dönecektir
-                    success = print_clean_m3u8(secure_hls_url)
-except Exception:
-    pass
+# --- YENİ AKIŞ SIRASI ---
+# 1. İlk olarak HTML koduna girmeden doğrudan yedek yapıyı dene
+success = fetch_from_backup()
 
-# Ana kaynak hata verdiğinde (403, 404, geçersiz link vb.) yedeğe geçer
+# 2. Yedek patlarsa veya geçersizse ana sitenin API akışına geç
 if not success:
-    fetch_from_backup()
+    fetch_from_main_site()
