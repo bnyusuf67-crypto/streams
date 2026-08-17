@@ -1,102 +1,33 @@
+import os
 import requests
-import re
-import urllib3
 
-urllib3.disable_warnings()
+playlist_url = "https://raw.githubusercontent.com/bnyusuf67-crypto/Get-website-information/refs/heads/main/playlist.m3u"
+output_file = "streams/atvavrupa.m3u8"
 
-TARGET_URL = "https://www.atvavrupa.tv/canli-yayin"
-BACKUP_URL = "https://uzunmuhalefet.unaux.com/trkvz.php?kanal=atvavrupa&.m3u8"
+# Download playlist
+response = requests.get(playlist_url)
+response.raise_for_status()
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Referer": TARGET_URL
-}
+lines = response.text.splitlines()
 
-def print_clean_m3u8(m3u8_url):
-    """Gelen adresten HTML içermeyen, temiz ve geçerli m3u8 yayınını yazdırır."""
-    try:
-        res = requests.get(m3u8_url, headers=headers, verify=False, timeout=10)
-        
-        if res.status_code != 200:
-            return False
+stream_url = None
 
-        text = res.text
-        if "<html" in text.lower() or "<body" in text.lower() or "#EXTM3U" not in text:
-            return False
+for i, line in enumerate(lines):
+    if line.strip() == "#EXTVLCOPT:http-referrer=https://www.atvavrupa.tv/canli-yayin":
+        if i + 1 < len(lines):
+            stream_url = lines[i + 1].strip()
+        break
 
-        base_url = m3u8_url.rsplit('/', 1)[0] + '/'
-        modified_content = ""
+if not stream_url:
+    raise Exception("ATV Avrupa not found in playlist")
 
-        for line in text.splitlines():
-            line_str = line.strip()
-            if line_str and not line_str.startswith("#"):
-                if not line_str.startswith("http"):
-                    modified_content += base_url + line_str + "\n"
-                else:
-                    modified_content += line_str + "\n"
-            else:
-                modified_content += line + "\n"
+# Download the referenced m3u8
+stream_response = requests.get(stream_url)
+stream_response.raise_for_status()
 
-        print(modified_content)
-        return True
-    except Exception:
-        return False
+os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-def fetch_from_backup():
-    """HTML koduna girmeden doğrudan yedek adresten yayını çekmeye çalışır."""
-    try:
-        res = requests.get(BACKUP_URL, headers=headers, verify=False, timeout=10)
-        if res.status_code == 200:
-            text = res.text
+with open(output_file, "w", encoding="utf-8") as f:
+    f.write(stream_response.text)
 
-            # Doğrudan m3u8 döndüyse yazdır
-            if "#EXTM3U" in text and "<html" not in text.lower():
-                return print_clean_m3u8(BACKUP_URL)
-
-            # HTML döndüyse içerikteki temiz m3u8 URL'sini süzüp çalıştır
-            matches = re.findall(r'https?://[^\s"\'<>]+(?:trkvz\.php\?[^\s"\'<>]*)', text)
-            for target_url in matches:
-                if target_url != BACKUP_URL:
-                    if print_clean_m3u8(target_url):
-                        return True
-    except Exception:
-        pass
-    return False
-
-def fetch_from_main_site():
-    """Yedek başarısız olursa ana sitenin HTML ve Turkuvaz API akışını çalıştırır."""
-    try:
-        response = requests.get(TARGET_URL, headers=headers, verify=False, timeout=10)
-        if response.status_code == 200:
-            site_content = response.text
-            
-            v_match = re.search(r'data-videoid=["\']([^"\']+)["\']', site_content)
-            w_match = re.search(r'data-websiteid=["\']([^"\']+)["\']', site_content)
-
-            if v_match and w_match:
-                video_id = v_match.group(1)
-                website_id = w_match.group(1)
-
-                getvideo_url = f"https://videojs.tmgrup.com.tr/getvideo/{website_id}/{video_id}"
-                video_res = requests.get(getvideo_url, headers=headers, verify=False, timeout=10)
-
-                if video_res.status_code == 200 and video_res.json().get("success"):
-                    raw_hls_url = video_res.json()["video"]["VideoSmilUrl"]
-
-                    secure_api = "https://securevideotoken.tmgrup.com.tr/webtv/secure"
-                    token_res = requests.get(secure_api, params={"url": raw_hls_url}, headers=headers, verify=False, timeout=10)
-
-                    if token_res.status_code == 200 and token_res.json().get("Success"):
-                        secure_hls_url = token_res.json().get("Url")
-                        return print_clean_m3u8(secure_hls_url)
-    except Exception:
-        pass
-    return False
-
-# --- YENİ AKIŞ SIRASI ---
-# 1. İlk olarak HTML koduna girmeden doğrudan yedek yapıyı dene
-success = fetch_from_backup()
-
-# 2. Yedek patlarsa veya geçersizse ana sitenin API akışına geç
-if not success:
-    fetch_from_main_site()
+print(f"Saved to {output_file}")
