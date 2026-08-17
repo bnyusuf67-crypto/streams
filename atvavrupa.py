@@ -13,12 +13,17 @@ headers = {
 }
 
 def print_clean_m3u8(m3u8_url):
-    """Gelen yanıtı kontrol eder, HTML kodlarını tamamen reddeder ve sadece saf m3u8 içeriğini ekrana basar."""
+    """HTTP durum kodunu, HTML içeriğini ve m3u8 geçerliliğini kontrol eder."""
     try:
         res = requests.get(m3u8_url, headers=headers, verify=False, timeout=15)
-        text = res.text
         
-        # Yanıt HTML içeriyorsa veya geçerli m3u8 başlığı barındırmıyorsa reddet
+        # 1. Katman: 403, 404, 500 gibi sunucu hatalarında anında reddet
+        if res.status_code != 200:
+            return False
+
+        text = res.text
+
+        # 2. Katman: HTML kodu içeriyorsa veya geçerli m3u8 değilse reddet
         if "<html" in text.lower() or "<body" in text.lower() or "#EXTM3U" not in text:
             return False
 
@@ -41,22 +46,22 @@ def print_clean_m3u8(m3u8_url):
         return False
 
 def fetch_from_backup():
-    """Yedek adresi çağırır; HTML geldiyse içerisindeki gizli/gerçek m3u8 bağlantısını çekip ham olarak yazdırır."""
+    """Yedek kaynağa bağlanıp HTML içermeyen temiz m3u8 yayınını getirir."""
     try:
         res = requests.get(BACKUP_URL, headers=headers, verify=False, timeout=15)
-        text = res.text
+        if res.status_code == 200:
+            text = res.text
 
-        # 1. Doğrudan m3u8 içeriği döndüyse yazdır
-        if "#EXTM3U" in text and "<html" not in text.lower():
-            return print_clean_m3u8(BACKUP_URL)
+            # Doğrudan m3u8 içeriği döndüyse yazdır
+            if "#EXTM3U" in text and "<html" not in text.lower():
+                return print_clean_m3u8(BACKUP_URL)
 
-        # 2. HTML kodu döndüyse, içindeki m3u8 veya parametreli yayın URL'sini HTML etiketlerinden tamamen süz
-        matches = re.findall(r'https?://[^\s"\'<>]+(?:trkvz\.php\?[^\s"\'<>]*|\.m3u8[^\s"\'<>]*)', text)
-        for target_url in matches:
-            if target_url != BACKUP_URL:
-                # Ayıklanan adrese istek atıp ham m3u8 çıktısını al
-                if print_clean_m3u8(target_url):
-                    return True
+            # HTML kodu döndüyse, içindeki gizli yayın URL'sini süzüp çağır
+            matches = re.findall(r'https?://[^\s"\'<>]+(?:trkvz\.php\?[^\s"\'<>]*)', text)
+            for target_url in matches:
+                if target_url != BACKUP_URL:
+                    if print_clean_m3u8(target_url):
+                        return True
     except Exception:
         pass
     return False
@@ -87,10 +92,11 @@ try:
 
                 if token_res.status_code == 200 and token_res.json().get("Success"):
                     secure_hls_url = token_res.json().get("Url")
+                    # Token URL'si 403/404 verirse print_clean_m3u8 False dönecektir
                     success = print_clean_m3u8(secure_hls_url)
 except Exception:
     pass
 
-# Ana yayın başarısız olursa HTML içermeyen temiz yedek yayını getir
+# Ana kaynak hata verdiğinde (403, 404, geçersiz link vb.) yedeğe geçer
 if not success:
     fetch_from_backup()
