@@ -68,7 +68,7 @@ def get_latest_segment_from_quality(m3u8_url, target_quality="_576p"):
         if not segment_lines:
             return None
 
-        # 3. Aşama: Alt listedeki en son (en güncel) segmenti al (-1 son, -2 bir önceki vb. ayarlanabilir)
+        # 3. Aşama: Alt listedeki en son (en güncel) segmenti al
         target_index = -1
         last_segment = segment_lines[target_index]
         
@@ -81,7 +81,7 @@ def get_latest_segment_from_quality(m3u8_url, target_quality="_576p"):
         return None
 
 def process_stream(m3u8_url):
-    """M3U8 yayınını temizler, ekrana basar ve istenen kalitedeki en güncel segmenti çıkarır."""
+    """M3U8 yayınını temizler, playlist.m3u ve segment.txt dosyalarına kaydeder."""
     try:
         res = requests.get(m3u8_url, headers=headers, verify=False, timeout=10)
         if res.status_code != 200:
@@ -104,18 +104,21 @@ def process_stream(m3u8_url):
             else:
                 modified_content += line + "\n"
 
-        print("--- TEMİZLENMİŞ M3U8 LİSTESİ ---")
-        print(modified_content)
-        
+        # 1. Temizlenmiş m3u8 listesini dosyaya yaz
+        with open("playlist.m3u", "w", encoding="utf-8") as f:
+            f.write(modified_content)
+
         # İstediğin kaliteyi buradan değiştirebilirsin (Örn: "_576p", "_360p", "_720p")
         desired_quality = "_576p"
         
-        print(f"--- EN GÜNCEL TS SEGMENTİ ({desired_quality}) ---")
+        # 2. En güncel segmenti bul ve ayrı bir dosyaya yaz
         latest_seg = get_latest_segment_from_quality(m3u8_url, target_quality=desired_quality)
         if latest_seg:
-            print(latest_seg)
+            with open("segment.txt", "w", encoding="utf-8") as f:
+                f.write(latest_seg)
+            print(f"Başarılı! 'playlist.m3u' ve 'segment.txt' ({desired_quality}) güncellendi.")
         else:
-            print("Segment bulunamadı.")
+            print("Playlist kaydedildi ancak segment bulunamadı.")
             
         return True
     except Exception:
@@ -171,9 +174,7 @@ def fetch_from_main_site():
     return False
 
 # --- ÇALIŞTIRMA AKIŞI ---
-# 1. İlk olarak yedek yapıyı dene
 success = fetch_from_backup()
 
-# 2. Yedek başarısız olursa ana sitenin API ve Token mekanizmasına geç
 if not success:
     fetch_from_main_site()
