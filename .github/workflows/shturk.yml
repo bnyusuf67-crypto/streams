@@ -2,7 +2,7 @@ name: shturk
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Gecikmelerden ötürü 30 dakikaya azaltıldı.
+    - cron: '*/30 * * * *' # Gecikmelerden ötürü 30 dakikaya azaltıldı.
   workflow_dispatch:
 
 permissions:
