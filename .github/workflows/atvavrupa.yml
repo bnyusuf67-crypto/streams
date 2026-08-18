@@ -2,33 +2,34 @@ name: atvavrupa
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
-  
+
 jobs:
-  build:
+  guncelle:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Repoyu Klonla
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          
-      - name: Install requests module
-        run: python3 -m pip install requests
+          pip install requests certifi
 
       - name: Execute Python script
-        run: python3 atvavrupa.py
-      
+        run: |
+          mkdir -p streams
+          python3 atvavrupa.py > streams/atvavrupa.m3u8
+
       - name: commit & push
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
