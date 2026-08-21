@@ -16,7 +16,7 @@ stream_url = None
 
 # Birebir satır eşleşmesi yerine kanal adını veya ID'sini esnek arayalım
 for i, line in enumerate(lines):
-    if '#EXTINF' in line and ('SozcuTV' in line or 'SZC .c' in line):
+    if '#EXTINF' in line and ('SZC .c' in line or 'SZC .d' in line):
         if i + 1 < len(lines):
             # Alt satırdaki URL'yi al ve sadece alfabetik/sayısal/link karakterlerini koru
             candidate = lines[i + 1].strip()
