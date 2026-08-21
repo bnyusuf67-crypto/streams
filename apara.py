@@ -3,7 +3,7 @@ import re
 import requests
 
 playlist_url = "https://raw.githubusercontent.com/k33n26/vavoo/refs/heads/main/iptv.m3u"
-output_file = "streams/anews.m3u8"
+output_file = "streams/apara.m3u8"
 
 response = requests.get(playlist_url)
 response.raise_for_status()
