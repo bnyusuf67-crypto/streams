@@ -12,8 +12,11 @@ lines = response.text.splitlines()
 
 stream_url = None
 
+# Tırnak çakışmasını önlemek için dış tırnaklar tek tırnak (') yapıldı
+target_line = '#EXTINF:-1 tvg-id="SozcuTV.tr@SD" tvg-name="SZC .c" tvg-logo="https://logo.huhu.to/logo?c=2036794972.png" group-title="Haber",SZC .c'
+
 for i, line in enumerate(lines):
-    if line.strip() == "#EXTINF:-1 tvg-id="SozcuTV.tr@SD" tvg-name="SZC .c" tvg-logo="https://logo.huhu.to/logo?c=2036794972.png" group-title="Haber",SZC .c":
+    if line.strip() == target_line:
         if i + 1 < len(lines):
             stream_url = lines[i + 1].strip()
         break
