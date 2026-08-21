@@ -27,12 +27,15 @@ if not stream_url:
 # Klasör yoksa oluştur
 os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-# Şablona göre yeni Master M3U8 dosyasını oluştur
-m3u8_content = f"""#EXTM3U
-#EXT-X-STREAM-INF:BANDWIDTH=7680000
-{stream_url}"""
+# Satırları temiz ve kesin bir formatta oluştur
+m3u8_lines = [
+    "#EXTM3U",
+    "#EXT-X-STREAM-INF:BANDWIDTH=7680000",
+    stream_url
+]
 
-with open(output_file, "w", encoding="utf-8") as f:
-    f.write(m3u8_content)
+# Satır sonlarını tam olarak \n ile birleştirip kaydet
+with open(output_file, "w", encoding="utf-8", newline="\n") as f:
+    f.write("\n".join(m3u8_lines) + "\n")
 
 print(f"Saved to {output_file}")
