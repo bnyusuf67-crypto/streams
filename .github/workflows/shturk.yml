@@ -35,5 +35,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add .
-          git commit -m "updated streams $(date +'%Y-%m-%d %H:%M:%S') [skip ci]" || echo "No updated streams"
+          git commit -m "updated streams $(date +'%Y-%m-%d %H:%M:%S')" || echo "No updated streams"
           git push
