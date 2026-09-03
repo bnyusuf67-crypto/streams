@@ -1,10 +1,10 @@
 import requests
 import re
-import json
 import urllib3
 
 base_url = "https://ciner-live.ercdn.net/showturk/"
 
+# Güvenlik uyarılarını kapat
 urllib3.disable_warnings()
 
 response = requests.get(
@@ -14,46 +14,36 @@ response = requests.get(
 )
 
 if response.status_code == 200:
-    site_content = response.text
+    # JSON veya HTML içindeki ters bölü (\/) kaçış karakterlerini temizle
+    site_content = response.text.replace("\\/", "/")
 
-    match = re.search(r"data-hope-video='(.*?)'", site_content, re.DOTALL)
+    # HTML içinde doğrudan http/https ile başlayıp .m3u8 ile biten ilk linki bulur
+    # data-hope-video veya src etiketlerine hiç bakmaz,m3u8 kodunun başına gereksiz parametreleri eklemez.
+    m3u8_match = re.search(r"https?://[^\s\"']+\.m3u8[^\s\"']*", site_content)
 
-    if match:
-        json_data_raw = match.group(1)
-        json_data_valid = json_data_raw.replace("\\/", "/")
+    if m3u8_match:
+        ht_stream_m3u8 = m3u8_match.group(0)
 
-        try:
-            ht_data = json.loads(json_data_valid)
+        # Canlı yayın içeriğini çekme ve base_url ekleme mantığı
+        content_response = requests.get(ht_stream_m3u8)
 
-            m3u8_list = ht_data.get('media', {}).get('m3u8', [])
-            ht_stream_m3u8 = m3u8_list[0].get('src') if m3u8_list else None
+        if content_response.status_code == 200:
+            content = content_response.text
+            lines = content.split("\n")
+            modified_content = ""
 
-            if ht_stream_m3u8:
-                content_response = requests.get(ht_stream_m3u8)
-
-                if content_response.status_code == 200:
-                    content = content_response.text
-                    lines = content.split("\n")
-                    modified_content = ""
-
-                    for line in lines:
-                        if line.startswith("showturk"):
-                            full_url = base_url + line
-                            modified_content += full_url + "\n"
-                        else:
-                            modified_content += line + "\n"
-
-                    print(modified_content)
+            for line in lines:
+                if line.startswith("showturk"):
+                    full_url = base_url + line
+                    modified_content += full_url + "\n"
                 else:
-                    print("Error fetching content from the Live URL.")
-            else:
-                print("Live URL not found in the JSON data.")
+                    modified_content += line + "\n"
 
-        except json.JSONDecodeError as e:
-            print(f"JSON decoding error: {e}")
-
+            print(modified_content)
+        else:
+            print("Canlı yayın URL'sinden içerik alınamadı.")
     else:
-        print("data-hope-video JSON not found in the content.")
+        print("Sayfa kaynak kodunda herhangi bir .m3u8 linki bulunamadı.")
 
 else:
-    print("Error: Status code is not 200.")
+    print(f"Hata: Durum kodu {response.status_code}")
